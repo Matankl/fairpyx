@@ -97,6 +97,7 @@ def Nearly_Fair_Division(alloc: AllocationBuilder) -> Optional[AllocationBuilder
     >>> divide(Nearly_Fair_Division, instance=instance3)
     {'A': ['o2'], 'B': ['o1']}
 
+
     >>> instance4 = Instance(
     ...     valuations={
     ...         "A": {"o1": 1, "o2": -1, "o3": 1, "o4": 1.5},
@@ -578,6 +579,7 @@ def is_EF11(
     The procedure is streaming and keeps only O(n·|C|) numbers.
     """
     agents = list(bundles.keys())
+    A, B = agents[0], agents[1]  # exactly two agents supported, so we can name them
 
     # ---------- Helper: category of an item ----------
     if getattr(instance, "item_categories", None) is None:
@@ -590,61 +592,91 @@ def is_EF11(
         cat_of   = lambda item: item_cat[item]
 
     # ---------- Pre-compute per agent ----------
-    #
-    # total_value[a]                – v_a(B_a)
-    # min_neg[a][c]   (optional)    – least (i.e. most negative) value in category c
-    # max_pos[a][c]   (optional)    – highest positive value in category c
-    #
-    min_neg = {a: {} for a in agents}
-    max_pos = {a: {} for a in agents}
-    total_value = {}
+    # total_value_eyes_of_A[x]                – how much A values the bundle of [x]
+    # total_value_eyes_of_B[x]                – how much B values the bundle of [x]
+    # wost_chore_in_cat_eyes_of_self[X][c]    – how badly X values its worst chore in category c
+    # best_good_in_cat_eyes_of_other[X][c]    – how well X values the best good of the other agent in category c
 
-    for a, B in bundles.items():
-        tot = 0.0
-        for item in B:
-            v = instance.agent_item_value(a, item)
-            tot += v
+    wost_chore_in_cat_eyes_of_self = {a: {} for a in agents}
+    best_good_in_cat_eyes_of_other = {a: {} for a in agents}
+    total_value_eyes_of_A = {}
+    total_value_eyes_of_B = {}
+
+    # starting with the first agent (A) perspective
+    for ag, Bundel in bundles.items(): # B = items of agent ag
+        total_A_for_itself = 0.0
+        total_A_for_other = 0.0
+        for item in Bundel:
+            v = instance.agent_item_value(A, item)      # the items value in the eyes of A
             c = cat_of(item)
+            if item in bundles[A]:                      # if the item is in the bundle of A
+                total_A_for_itself += v
+            else:                                       # if the item is in the bundle of B
+                total_A_for_other += v
 
-            if v < 0:                          # chore for a
-                d = min_neg[a].get(c,  inf)
-                if v < d:                       # store *most* negative
-                    min_neg[a][c] = v
-            elif v > 0:                         # good for a
-                d = max_pos[a].get(c, -inf)
+            if v < 0 and item in bundles[A]:                            # chore for ag
+                d = wost_chore_in_cat_eyes_of_self[A].get(c,  inf)
+                if v < d:                                               # store *most* negative
+                    wost_chore_in_cat_eyes_of_self[A][c] = v
+            elif v > 0 and item not in bundles[A]:                      # good for ag
+                d = best_good_in_cat_eyes_of_other[B].get(c, -inf)
                 if v > d:
-                    max_pos[a][c] = v
-            # v == 0 never helps either side, so ignore
-        total_value[a] = tot
+                    best_good_in_cat_eyes_of_other[B][c] = v
+        total_value_eyes_of_A[A] = total_A_for_itself
+        total_value_eyes_of_A[B] = total_A_for_other
 
-    # ---------- Check every ordered pair (i, j) ----------
-    for i in agents:
-        for j in agents:
-            if i == j:
-                continue
 
-            gap = total_value[i] - total_value[j]      # positive ⇒ no envy
-            if gap >= 0:
-                continue                               # i already happy
+    # starting with the first agent (B) perspective
+    for ag, Bundel in bundles.items(): # B = items of agent ag
+        total_B_for_itself = 0.0
+        total_B_for_other = 0.0
+        for item in Bundel:
+            v = instance.agent_item_value(B, item)      # the items value in the eyes of B
+            c = cat_of(item)
+            if item in bundles[B]:                      # if the item is in the bundle of B
+                total_B_for_itself += v
+            else:                                       # if the item is in the bundle of A
+                total_B_for_other += v
 
-            # i envies j.  We must bridge |gap| by removing one chore from i
-            # and one good from j in the *same* category.
-            needed = -gap                              # amount we must gain
+            if v < 0 and item in bundles[B]:                            # chore for ag
+                d = wost_chore_in_cat_eyes_of_self[B].get(c,  inf)
+                if v < d:                                               # store *most* negative
+                    wost_chore_in_cat_eyes_of_self[B][c] = v
+            elif v > 0 and item not in bundles[B]:                      # good for ag
+                d = best_good_in_cat_eyes_of_other[A].get(c, -inf)
+                if v > d:
+                    best_good_in_cat_eyes_of_other[A][c] = v
+        total_value_eyes_of_B[B] = total_B_for_itself
+        total_value_eyes_of_B[A] = total_B_for_other
 
-            # Iterate only over categories where both sides *could* help.
-            #
-            # Note:  min_neg[i]       – categories where i owns at least one chore
-            #        max_pos[j]       – categories where j owns at least one good
-            candidate_categories = set(min_neg[i]).intersection(max_pos[j])
 
-            for c in candidate_categories:
-                gain = -min_neg[i][c] + max_pos[j][c]  # −v_i(chore) + v_i(good)
-                if gain >= needed:                     # envy eliminated
-                    break
-            else:
-                return (i, j)  # Found a violating pair
+    # ---------- look for envy and if it can be fixed ----------
 
-    return None
+    # first check A envies B
+    gap = total_value_eyes_of_A[A] - total_value_eyes_of_A[B]      # positive ⇒ no envy
+    if gap < 0:                               # A envies B
+        needed = -gap                          # amount we must gain
+        candidate_categories = set(wost_chore_in_cat_eyes_of_self[A]).intersection(best_good_in_cat_eyes_of_other[B])
+        for c in candidate_categories:
+            gain = -wost_chore_in_cat_eyes_of_self[A][c] + best_good_in_cat_eyes_of_other[B][c]
+            if gain >= needed:                     # envy eliminated
+                break
+        else:
+            return (A, B)  # Found a violating pair
+
+    # then check B envies A
+    gap = total_value_eyes_of_B[B] - total_value_eyes_of_B[A]      # positive ⇒ no envy
+    if gap < 0:                               # B envies A
+        needed = -gap                          # amount we must gain
+        candidate_categories = set(wost_chore_in_cat_eyes_of_self[B]).intersection(best_good_in_cat_eyes_of_other[A])
+        for c in candidate_categories:
+            gain = -wost_chore_in_cat_eyes_of_self[B][c] + best_good_in_cat_eyes_of_other[A][c]
+            if gain >= needed:                     # envy eliminated
+                break
+        else:
+            return (B, A)
+
+    return None  # All pairs satisfied EF[1,1]
 
 
 def is_EF1(allocation: "AllocationBuilder",
@@ -726,8 +758,8 @@ if __name__ == "__main__":
     import doctest
     import sys
     logger.addHandler(logging.StreamHandler(sys.stdout))
-    # logger.setLevel(logging.INFO)
-    # logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
     print(doctest.testmod())
 
 
@@ -926,3 +958,111 @@ def w_max_two_agents(alloc: "AllocationBuilder",
 #
 # # All pairs passed
 # return None
+
+
+def old_is_EF11(                        # the problem with this function is that it dosent use aperspective to judge the bundel of b and the opposite(also as dor the best good and worst chore)
+        instance: "Instance",
+        bundles: Dict[Hashable, Iterable[Hashable]],
+) -> Optional[Tuple[Hashable, Hashable]]:
+    """
+    Return **True** iff the given allocation is envy-free-up-to-one-good-and-one-chore
+    (EF[1,1]) with respect to the *instance*.
+    Fit only for 1 good and 1 chore only goods and chores will be checked using EF1
+
+    Parameters
+    ----------
+    instance : Instance
+        The instance that supplies all valuations and (optionally) item categories
+        via `instance.agent_item_value(a,i)`  and `instance.item_categories[i]`.
+    bundles : dict(agent -> iterable(item))
+        The final allocation, e.g. the `bundles` attribute of an
+        `AllocationBuilder`, or its `.sorted()` result.
+
+    The definition implemented is the one highlighted in the paper:
+
+        For every ordered pair of agents (i, j)
+        either i already values her bundle at least as much as j’s bundle, **or**
+        there exists
+            • one *chore* (negatively-valued item for i) in i’s bundle and
+            • one *good*  (positively-valued item for i) in j’s bundle
+        that lie in the *same category* (if categories are used), such that after
+        simultaneously removing those two items i does not envy j.
+
+    Complexity
+    ----------
+    *Pre-processing*          Θ(Σ |B_a|) (one pass over the allocation)
+    *Pair check* (worst-case) Θ(|C|) for each ordered pair (i, j) –
+                              thus overall  Θ(n²·|C|) where |C| ≤ number of items.
+                              In typical course-allocation sizes this is negligible.
+    The procedure is streaming and keeps only O(n·|C|) numbers.
+    """
+    agents = list(bundles.keys())
+
+    # ---------- Helper: category of an item ----------
+    if getattr(instance, "item_categories", None) is None:
+        # If no categories are supplied, treat all items as belonging to the single
+        # dummy category None, which exactly matches the paper's definition with no
+        # category restriction.
+        cat_of = lambda item: None
+    else:
+        item_cat = instance.item_categories
+        cat_of   = lambda item: item_cat[item]
+
+    # ---------- Pre-compute per agent ----------
+    #
+    # total_value[a]                – v_a(B_a)
+    # min_neg[a][c]   (optional)    – least (i.e. most negative) value in category c
+    # max_pos[a][c]   (optional)    – highest positive value in category c
+    #
+    min_neg = {a: {} for a in agents}
+    max_pos = {a: {} for a in agents}
+    total_value = {}
+
+    for ag, B in bundles.items(): # B = items of agent ag
+        tot = 0.0
+        for item in B:
+            v = instance.agent_item_value(ag, item) # the items value in the eyes of ag
+            tot += v
+            c = cat_of(item)
+
+            if v < 0:                          # chore for ag
+                d = min_neg[ag].get(c,  inf)
+                if v < d:                       # store *most* negative
+                    min_neg[ag][c] = v
+            elif v > 0:                         # good for ag
+                d = max_pos[ag].get(c, -inf)
+                if v > d:
+                    max_pos[ag][c] = v
+            # v == 0 never helps either side, so ignore
+        total_value[ag] = tot                  # this contain the total value of each agent for their own bundle!!!!!!!
+    print("this is the totoal value amounts",total_value)
+    print("those are the bundels the total value is calculated from",bundles)
+
+    # ---------- Check every ordered pair (i, j) ----------
+    for i in agents:
+        for j in agents:
+            if i == j:
+                continue
+
+            gap = total_value[i] - total_value[j]      # positive ⇒ no envy
+            if gap >= 0:
+                continue                               # i am already happy
+
+            # i envies j.  We must bridge |gap| by removing one chore from i
+            # and one good from j in the *same* category.
+            needed = -gap                              # amount we must gain
+
+            # Iterate only over categories where both sides *could* help.
+            #
+            # Note:  min_neg[i]       – categories where i owns at least one chore
+            #        max_pos[j]       – categories where j owns at least one good
+            candidate_categories = set(min_neg[i]).intersection(max_pos[j])
+
+            for c in candidate_categories:
+                gain = -min_neg[i][c] + max_pos[j][c]  # −v_i(chore) + v_i(good)
+                if gain >= needed:                     # envy eliminated
+                    break
+            else:
+                return (i, j)  # Found a violating pair
+
+    return None
