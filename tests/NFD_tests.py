@@ -17,10 +17,10 @@ from itertools import combinations
 
 
 
-def generate_random_instance(seed=42):
+def generate_large_random_instance(seed=42, num_items=200) -> "Instance":
     random.seed(seed)
     agents = ["A", "B"]
-    num_items = 200
+    num_items = num_items
     categories = [f"cat{i}" for i in range(10)]
     items = [f"o{i}" for i in range(num_items)]
     valuations = {
@@ -199,10 +199,28 @@ def test_large_balanced():
 
 
 # ---------------------------
-# Random Inputs
+# Random Large Inputs
 # ---------------------------
-def test_random_instance():
-    instance = generate_random_instance()
+def test_large_random_instance_100_items():
+    instance = generate_large_random_instance(num_items=100)
+    print("Random Instance:", instance)
+    allocation = divide(Nearly_Fair_Division, instance)
+    print("Allocation:", allocation)
+    alloc = AllocationBuilder(instance)
+    alloc = Nearly_Fair_Division(alloc)
+    total_allocated = sum(len(v) for v in allocation.values())
+    assert total_allocated == len(instance.items)
+    for agent in instance.agents:
+        for cat in instance.categories_capacities:
+            items_in_cat = [i for i in allocation[agent] if instance.item_categories[i] == cat]
+            assert len(items_in_cat) <= instance.categories_capacities[cat]
+
+    assert (is_EF11(alloc.instance, alloc.bundles) is None or
+            is_EF1(alloc) is None)
+    assert is_pareto_optimal(instance, allocation)
+
+def test_large_random_instance_200_itemns():
+    instance = generate_large_random_instance()
     print("Random Instance:" , instance)
     allocation = divide(Nearly_Fair_Division, instance)
     print("Allocation:", allocation)
@@ -219,7 +237,82 @@ def test_random_instance():
             is_EF1(alloc) is None)
     assert is_pareto_optimal(instance, allocation)
 
+def test_large_random_instance_300_items():
+    instance = generate_large_random_instance(num_items=300)
+    print("Random Instance:" , instance)
+    allocation = divide(Nearly_Fair_Division, instance)
+    print("Allocation:", allocation)
+    alloc = AllocationBuilder(instance)
+    alloc = Nearly_Fair_Division(alloc)
+    total_allocated = sum(len(v) for v in allocation.values())
+    assert total_allocated == len(instance.items)
+    for agent in instance.agents:
+        for cat in instance.categories_capacities:
+            items_in_cat = [i for i in allocation[agent] if instance.item_categories[i] == cat]
+            assert len(items_in_cat) <= instance.categories_capacities[cat]
 
+    assert (is_EF11(alloc.instance, alloc.bundles) is None or
+            is_EF1(alloc) is None)
+    assert is_pareto_optimal(instance, allocation)
+
+def test_large_random_instance_400_items():
+    instance = generate_large_random_instance(num_items=400)
+    print("Random Instance:" , instance)
+    allocation = divide(Nearly_Fair_Division, instance)
+    print("Allocation:", allocation)
+    alloc = AllocationBuilder(instance)
+    alloc = Nearly_Fair_Division(alloc)
+    total_allocated = sum(len(v) for v in allocation.values())
+    assert total_allocated == len(instance.items)
+    for agent in instance.agents:
+        for cat in instance.categories_capacities:
+            items_in_cat = [i for i in allocation[agent] if instance.item_categories[i] == cat]
+            assert len(items_in_cat) <= instance.categories_capacities[cat]
+
+    assert (is_EF11(alloc.instance, alloc.bundles) is None or
+            is_EF1(alloc) is None)
+    assert is_pareto_optimal(instance, allocation)
+
+def test_large_random_instance_500_items():
+    instance = generate_large_random_instance(num_items=500)
+    print("Random Instance:", instance)
+    allocation = divide(Nearly_Fair_Division, instance)
+    print("Allocation:", allocation)
+    alloc = AllocationBuilder(instance)
+    alloc = Nearly_Fair_Division(alloc)
+    total_allocated = sum(len(v) for v in allocation.values())
+    assert total_allocated == len(instance.items)
+    for agent in instance.agents:
+        for cat in instance.categories_capacities:
+            items_in_cat = [i for i in allocation[agent] if instance.item_categories[i] == cat]
+            assert len(items_in_cat) <= instance.categories_capacities[cat]
+
+    assert (is_EF11(alloc.instance, alloc.bundles) is None or
+                is_EF1(alloc) is None)
+    assert is_pareto_optimal(instance, allocation)
+
+def test_large_random_instance_1000_items():
+    instance = generate_large_random_instance(num_items=1000)
+    print("Random Instance:", instance)
+    allocation = divide(Nearly_Fair_Division, instance)
+    print("Allocation:", allocation)
+    alloc = AllocationBuilder(instance)
+    alloc = Nearly_Fair_Division(alloc)
+    total_allocated = sum(len(v) for v in allocation.values())
+    assert total_allocated == len(instance.items)
+    for agent in instance.agents:
+        for cat in instance.categories_capacities:
+            items_in_cat = [i for i in allocation[agent] if instance.item_categories[i] == cat]
+            assert len(items_in_cat) <= instance.categories_capacities[cat]
+
+    assert (is_EF11(alloc.instance, alloc.bundles) is None or
+                is_EF1(alloc) is None)
+    assert is_pareto_optimal(instance, allocation)
+
+
+# ---------------------------
+# Testing EF1 and EF11
+# ---------------------------
 
 def make_instance_and_allocation(
     agent_vals,           # e.g. {"A": {"x": -5, "y": 10}, "B": {"x": 3, "y": 0}}
@@ -250,7 +343,7 @@ def test_ef11_satisfied_simple_case():
 
 def test_ef11_violation_found():
     agent_vals = {
-        "A": {"x": -5, "y": 2, "z": -1},   # A has x (bad), B has y (good), both math
+        "A": {"x": -5, "y": 6, "z": -1},   # A has x (bad), B has y (good), both math
         "B": {"x": 1, "y": 6, "z": -1}
     }
     alloc = {
@@ -265,13 +358,14 @@ def test_ef11_violation_found():
 
 
 def test_large_two_agent_ef11_violation():
+    # this situation is EF1 but not EF11!
     agent_vals = {
         "A": {"c1": -8, "c2": -2, "c3": 1,  "c4": 0,  "c5": 2,  "c6": 0},
         "B": {"c1": -1, "c2":  0, "c3": 6,  "c4": 7,  "c5": 1,  "c6": 3},
     }
     alloc = {
         "A": ["c1", "c3", "c4"],      # Value for A: -8 + 1 + 0 = -7
-        "B": ["c2", "c5", "c6"]       # Value for A: 0 + 2 + 0 = 2 → envy of 9
+        "B": ["c2", "c5", "c6"]       # Value for A: -2 + 2 + 0 = 0 → envy of 7
     }
     cat = {
         "c1": "math",
@@ -286,7 +380,7 @@ def test_large_two_agent_ef11_violation():
     result = is_EF11(inst, builder.bundles)
     assert result == ("A", "B")
 
-def test_multiple_items_per_agent():
+def test_multiple_items_per_agent_ef11():
     agent_vals = {
         "A": {"x": -5, "y": 10, "z": 2},
         "B": {"x": 3, "y": 1, "z": 6}
@@ -299,17 +393,17 @@ def test_multiple_items_per_agent():
 
     inst, builder = make_instance_and_allocation(agent_vals, alloc, cat)
     result = is_EF11(inst, builder.bundles)
-    assert result is None  # A can drop x (chore), gain y (good) in same category
+    assert result is None  # A can drop x (chore), and y (good) in same category
 
 
 def test_ef1_holds_with_chore_and_good():
     agent_vals = {
-        "A": {"x": -1, "y": -1},
+        "A": {"x": -2, "y": -1},
         "B": {"x": -1, "y": 2}
     }
     alloc = {
-        "A": ["x"],     # value for A: -4 + 10 = 6
-        "B": ["y"]           # value for A: 2
+        "A": ["x"],     # value for A: -2
+        "B": ["y"]      # value for A: -1
     }
 
     inst, builder = make_instance_and_allocation(agent_vals, alloc)
@@ -331,7 +425,10 @@ def test_ef1_violation_detected():
     result = is_EF1(builder)
     assert result == ("A", "B")
 
-def test_two_categories_equal_entitlement():
+# ---------------------------
+# Testing W-Max with Categories
+# ---------------------------
+def test_w_max_two_categories_equal_entitlement():
     instance = Instance(
         valuations={
             "A": {"x1": 10, "x2": 5, "y1": 7, "y2": 1},
@@ -347,7 +444,7 @@ def test_two_categories_equal_entitlement():
     assert all_items == {"x1", "x2", "y1", "y2"}
 
 
-def test_category_capacity_per_agent():
+def test_w_max_category_capacity_per_agent():
     instance = Instance(
         valuations={
             "A": {"x1": 10, "x2": 8, "y1": 7, "y2": 2},
@@ -366,7 +463,7 @@ def test_category_capacity_per_agent():
             assert len(items_in_cat) <= 1
 
 
-def test_conflict_blocks_agent():
+def test_w_max_conflict_blocks_agent():
     instance = Instance(
         valuations={
             "A": {"x1": 9, "y1": 1},
@@ -383,7 +480,7 @@ def test_conflict_blocks_agent():
     assert "y1" not in alloc.bundles["A"]
 
 
-def test_weighted_entitlement():
+def test_w_max_weighted_entitlement():
     instance = Instance(
         valuations={
             "A": {"x1": 20, "y1": 5},
@@ -400,7 +497,7 @@ def test_weighted_entitlement():
     assert "y1" in alloc.bundles["B"]
 
 
-def test_tie_case():
+def test_w_max_tie_case():
     instance = Instance(
         valuations={
             "A": {"x": 10},

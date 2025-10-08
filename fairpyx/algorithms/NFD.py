@@ -603,9 +603,9 @@ def is_EF11(
     total_value_eyes_of_B = {}
 
     # starting with the first agent (A) perspective
+    total_A_for_itself = 0.0
+    total_A_for_other = 0.0
     for ag, Bundel in bundles.items(): # B = items of agent ag
-        total_A_for_itself = 0.0
-        total_A_for_other = 0.0
         for item in Bundel:
             v = instance.agent_item_value(A, item)      # the items value in the eyes of A
             c = cat_of(item)
@@ -622,8 +622,8 @@ def is_EF11(
                 d = best_good_in_cat_eyes_of_other[B].get(c, -inf)
                 if v > d:
                     best_good_in_cat_eyes_of_other[B][c] = v
-        total_value_eyes_of_A[A] = total_A_for_itself
-        total_value_eyes_of_A[B] = total_A_for_other
+    total_value_eyes_of_A[A] = total_A_for_itself
+    total_value_eyes_of_A[B] = total_A_for_other
 
 
     # starting with the first agent (B) perspective
