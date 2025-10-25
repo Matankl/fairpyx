@@ -24,12 +24,9 @@ from math import inf
 # a dict of categories and the capacities
 
 
-
 # The `logging` facility is used both for debugging and for illustrating the steps of the algorithm.
 # It can be used to automatically generate running examples or explanations.
 import logging
-
-
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +46,7 @@ example_instance = Instance(
     # agent_capacities={"Agent1": 3, "Agent2": 3},
     item_categories={
         "o1": "cat1", "o2": "cat1", "o3": "cat1", "o4": "cat1",  # 4 items in category 1
-        "o5": "cat2", "o6": "cat2"                               # 2 items in category 2
+        "o5": "cat2", "o6": "cat2"  # 2 items in category 2
     },
     item_capacities={item: 1 for item in item_categories.keys()},
     # item_capacities={"o1": 1, "o2": 1, "o3": 1, "o4": 1, "o5": 1, "o6": 1},
@@ -140,9 +137,9 @@ def Nearly_Fair_Division(alloc: AllocationBuilder) -> Optional[AllocationBuilder
     logger.debug("remaining_item_capacities after w-max = %s", alloc.remaining_item_capacities)
     logger.info(f"Bundles after W-max: {alloc.bundles}, this may noy be the final allocation.")
 
-
     # ---------- 2) envy-elimination loop ----------
     logger.info("Start envy-elimination loop (EF[1,1] checks + swaps)")
+
     def candidates_r_ratio(instance, bundles, envier, envied):
         """
         Find all same-category (o_envier, o_envied) pairs whose swap would improve
@@ -226,7 +223,8 @@ def Nearly_Fair_Division(alloc: AllocationBuilder) -> Optional[AllocationBuilder
             break
 
         envier, envied = status
-        logger.info("EF[1,1] violation found: envier=%s envied=%s, starting envy-elimination iteration.", envier, envied)
+        logger.info("EF[1,1] violation found: envier=%s envied=%s, starting envy-elimination iteration.", envier,
+                    envied)
 
         # Candidate items that envier can still accept
         logger.info("Finding candidates to swap for envier %s and envied %s", envier, envied)
@@ -243,9 +241,9 @@ def Nearly_Fair_Division(alloc: AllocationBuilder) -> Optional[AllocationBuilder
                            envier, envied)
             return None
 
-
     logger.info("NFD finished successfully. Final allocation: %s \n\n\n\n", alloc.bundles)
     return alloc
+
 
 # ---------------------------------------------------------------------------
 #  W-MAXIMAL ALLOCATION FOR TWO AGENTS
@@ -325,21 +323,21 @@ That’s it—the partial allocation in alloc is now a w-maximal extension over 
     # ------------------------------------------------------------------
     # (0) Preparations & sanity checks
     # ------------------------------------------------------------------
-    inst           = alloc.instance
-    agents         = list(inst.agents)
+    inst = alloc.instance
+    agents = list(inst.agents)
     if len(agents) != 2:
         raise ValueError("w_max_two_agents currently supports exactly two agents.")
-    a1, a2         = agents                          # deterministic order
-    w1, w2         = weights
+    a1, a2 = agents  # deterministic order
+    w1, w2 = weights
     if abs(w1 + w2 - 1) > 1e-9 or min(w1, w2) < 0:
         raise ValueError("weights must be non-negative and sum to 1.")
 
     # Helper lambdas – shorter to read below
     u = inst.agent_item_value
-    item_cap   : Dict[str, int] = alloc.remaining_item_capacities
-    agent_cap  : Dict[str, int] = alloc.remaining_agent_capacities
-    cat_cap    : Dict[str, Dict[str, int]] | None = getattr(alloc, "agents_category_capacities", None)
-    item_cat   = inst.item_categories or {}
+    item_cap: Dict[str, int] = alloc.remaining_item_capacities
+    agent_cap: Dict[str, int] = alloc.remaining_agent_capacities
+    cat_cap: Dict[str, Dict[str, int]] | None = getattr(alloc, "agents_category_capacities", None)
+    item_cat = inst.item_categories or {}
 
     # ------------------------------------------------------------------
     # (1) Build the bipartite graph  G₍w₎  as in Definition 4.1 in the paper
@@ -350,7 +348,7 @@ That’s it—the partial allocation in alloc is now a w-maximal extension over 
     #
     # One “unit” copy per *remaining* unit of agent capacity.
     # We keep a mapping  copy_id -> original_agent  for later.
-    agent_copy_to_agent : Dict[str, str] = {}
+    agent_copy_to_agent: Dict[str, str] = {}
     for ag in agents:
         for k in range(agent_cap.get(ag, 0)):
             node = f"AG[{ag}]#{k}"
@@ -359,7 +357,7 @@ That’s it—the partial allocation in alloc is now a w-maximal extension over 
 
     # (1b) COPY NODES FOR ITEMS
     # One copy for every still available unit of each item’s capacity.
-    item_copy_to_item : Dict[str, str] = {}
+    item_copy_to_item: Dict[str, str] = {}
     for itm, cap in item_cap.items():
         for k in range(cap):
             node = f"IT[{itm}]#{k}"
@@ -399,7 +397,7 @@ That’s it—the partial allocation in alloc is now a w-maximal extension over 
     # ------------------------------------------------------------------
     # maxcardinality=True  ==>  among all maximum-cardinality matchings
     #                         choose the one of max weight.
-    matching : set[Tuple[str, str]] = nx.algorithms.matching.max_weight_matching(
+    matching: set[Tuple[str, str]] = nx.algorithms.matching.max_weight_matching(
         G, maxcardinality=True, weight="weight"
     )
 
@@ -414,7 +412,7 @@ That’s it—the partial allocation in alloc is now a w-maximal extension over 
         else:
             a_copy, i_copy = v2, v1
         agent = agent_copy_to_agent[a_copy]
-        item  = item_copy_to_item[i_copy]
+        item = item_copy_to_item[i_copy]
 
         # The give() call decrements capacities and adds conflicts inside
         # AllocationBuilder, which is exactly what we want here.
@@ -552,7 +550,7 @@ def category_w_max_two_agents(alloc: "AllocationBuilder", *, weights: List[float
         # ----------------------------------------------------------------
         tmp_alloc = AllocationBuilder(
             # alloc.remaining_instance()        # same valuations/conflicts…
-            alloc.instance       # same valuations/conflicts…
+            alloc.instance  # same valuations/conflicts…
         )
 
         # 1. Keep only items from this category.
@@ -635,7 +633,7 @@ def is_EF11(
         cat_of = lambda item: None
     else:
         item_cat = instance.item_categories
-        cat_of   = lambda item: item_cat[item]
+        cat_of = lambda item: item_cat[item]
 
     # ---------- Pre-compute per agent ----------
     # total_value_eyes_of_A[x]                – how much A values the bundle of [x]
@@ -651,73 +649,71 @@ def is_EF11(
     # starting with the first agent (A) perspective
     total_A_for_itself = 0.0
     total_A_for_other = 0.0
-    for ag, Bundel in bundles.items(): # B = items of agent ag
+    for ag, Bundel in bundles.items():  # B = items of agent ag
         for item in Bundel:
-            v = instance.agent_item_value(A, item)      # the items value in the eyes of A
+            v = instance.agent_item_value(A, item)  # the items value in the eyes of A
             c = cat_of(item)
-            if item in bundles[A]:                      # if the item is in the bundle of A
+            if item in bundles[A]:  # if the item is in the bundle of A
                 total_A_for_itself += v
-            else:                                       # if the item is in the bundle of B
+            else:  # if the item is in the bundle of B
                 total_A_for_other += v
 
-            if v < 0 and item in bundles[A]:                            # chore for ag
-                d = wost_chore_in_cat_eyes_of_self[A].get(c,  inf)
-                if v < d:                                               # store *most* negative
+            if v < 0 and item in bundles[A]:  # chore for ag
+                d = wost_chore_in_cat_eyes_of_self[A].get(c, inf)
+                if v < d:  # store *most* negative
                     wost_chore_in_cat_eyes_of_self[A][c] = v
-            elif v > 0 and item not in bundles[A]:                      # good for ag
+            elif v > 0 and item not in bundles[A]:  # good for ag
                 d = best_good_in_cat_eyes_of_other[B].get(c, -inf)
                 if v > d:
                     best_good_in_cat_eyes_of_other[B][c] = v
     total_value_eyes_of_A[A] = total_A_for_itself
     total_value_eyes_of_A[B] = total_A_for_other
 
-
     # starting with the first agent (B) perspective
-    for ag, Bundel in bundles.items(): # B = items of agent ag
+    for ag, Bundel in bundles.items():  # B = items of agent ag
         total_B_for_itself = 0.0
         total_B_for_other = 0.0
         for item in Bundel:
-            v = instance.agent_item_value(B, item)      # the items value in the eyes of B
+            v = instance.agent_item_value(B, item)  # the items value in the eyes of B
             c = cat_of(item)
-            if item in bundles[B]:                      # if the item is in the bundle of B
+            if item in bundles[B]:  # if the item is in the bundle of B
                 total_B_for_itself += v
-            else:                                       # if the item is in the bundle of A
+            else:  # if the item is in the bundle of A
                 total_B_for_other += v
 
-            if v < 0 and item in bundles[B]:                            # chore for ag
-                d = wost_chore_in_cat_eyes_of_self[B].get(c,  inf)
-                if v < d:                                               # store *most* negative
+            if v < 0 and item in bundles[B]:  # chore for ag
+                d = wost_chore_in_cat_eyes_of_self[B].get(c, inf)
+                if v < d:  # store *most* negative
                     wost_chore_in_cat_eyes_of_self[B][c] = v
-            elif v > 0 and item not in bundles[B]:                      # good for ag
+            elif v > 0 and item not in bundles[B]:  # good for ag
                 d = best_good_in_cat_eyes_of_other[A].get(c, -inf)
                 if v > d:
                     best_good_in_cat_eyes_of_other[A][c] = v
         total_value_eyes_of_B[B] = total_B_for_itself
         total_value_eyes_of_B[A] = total_B_for_other
 
-
     # ---------- look for envy and if it can be fixed ----------
 
     # first check A envies B
-    gap = total_value_eyes_of_A[A] - total_value_eyes_of_A[B]      # positive ⇒ no envy
-    if gap < 0:                               # A envies B
-        needed = -gap                          # amount we must gain
+    gap = total_value_eyes_of_A[A] - total_value_eyes_of_A[B]  # positive ⇒ no envy
+    if gap < 0:  # A envies B
+        needed = -gap  # amount we must gain
         candidate_categories = set(wost_chore_in_cat_eyes_of_self[A]).intersection(best_good_in_cat_eyes_of_other[B])
         for c in candidate_categories:
             gain = -wost_chore_in_cat_eyes_of_self[A][c] + best_good_in_cat_eyes_of_other[B][c]
-            if gain >= needed:                     # envy eliminated
+            if gain >= needed:  # envy eliminated
                 break
         else:
             return (A, B)  # Found a violating pair
 
     # then check B envies A
-    gap = total_value_eyes_of_B[B] - total_value_eyes_of_B[A]      # positive ⇒ no envy
-    if gap < 0:                               # B envies A
-        needed = -gap                          # amount we must gain
+    gap = total_value_eyes_of_B[B] - total_value_eyes_of_B[A]  # positive ⇒ no envy
+    if gap < 0:  # B envies A
+        needed = -gap  # amount we must gain
         candidate_categories = set(wost_chore_in_cat_eyes_of_self[B]).intersection(best_good_in_cat_eyes_of_other[A])
         for c in candidate_categories:
             gain = -wost_chore_in_cat_eyes_of_self[B][c] + best_good_in_cat_eyes_of_other[A][c]
-            if gain >= needed:                     # envy eliminated
+            if gain >= needed:  # envy eliminated
                 break
         else:
             return (B, A)
@@ -727,7 +723,7 @@ def is_EF11(
 
 def is_EF1(allocation: "AllocationBuilder",
            abs_tol: float = 1e-9
-          ) -> Optional[Tuple[Any, Any]]:
+           ) -> Optional[Tuple[Any, Any]]:
     """
     Determine whether the current allocation is EF1 (Envy-Free up to one
     item) for *mixed* goods/chores.
@@ -760,20 +756,20 @@ def is_EF1(allocation: "AllocationBuilder",
       at categories.
     * Runs in O(n² · m) where n = #agents, m = max-bundle-size.
     """
-    inst     = allocation.instance
-    bundles  = allocation.bundles                       # :contentReference[oaicite:0]{index=0}
-    value_of = inst.agent_bundle_value                  # :contentReference[oaicite:1]{index=1}
+    inst = allocation.instance
+    bundles = allocation.bundles  # :contentReference[oaicite:0]{index=0}
+    value_of = inst.agent_bundle_value  # :contentReference[oaicite:1]{index=1}
 
     # Cache each agent’s own-bundle value once
     own_val = {a: value_of(a, bundles[a]) for a in inst.agents}
 
     for i in inst.agents:
-        A_i   = bundles[i]
+        A_i = bundles[i]
         v_iAi = own_val[i]
         for j in inst.agents:
             if i == j:
                 continue
-            A_j   = bundles[j]
+            A_j = bundles[j]
             v_iAj = value_of(i, A_j)
 
             # 1 Plain no-envy
@@ -794,27 +790,23 @@ def is_EF1(allocation: "AllocationBuilder",
                         envy_gone = True
                         break
 
-            if not envy_gone:          # EF1 violated for (i, j)
+            if not envy_gone:  # EF1 violated for (i, j)
                 return (i, j)
 
-    return None    # All pairs satisfied EF1
+    return None  # All pairs satisfied EF1
 
 
 if __name__ == "__main__":
     import doctest
     import sys
+
     logger.addHandler(logging.StreamHandler(sys.stdout))
     logger.setLevel(logging.INFO)
     # logger.setLevel(logging.DEBUG)
     print(doctest.testmod())
 
 
-
-
-
-
-
-#________________________ Private functions havent been tested ________________________
+# ________________________ Private functions havent been tested ________________________
 # ----------------------------------------------------------------------
 #  W-maximisation for two agents my greedy algorithm, hevent been tested
 # ----------------------------------------------------------------------
@@ -869,7 +861,7 @@ def w_max_two_agents(alloc: "AllocationBuilder",
     agents: List[str] = list(inst.agents)
     if len(agents) != 2:
         raise ValueError("w_max_two_agents currently supports *exactly* two agents.")
-    a1, a2 = agents # fixed order
+    a1, a2 = agents  # fixed order
 
     # Normalise the weight container → dict {agent: weight}
     if not isinstance(weights, dict):
@@ -883,11 +875,11 @@ def w_max_two_agents(alloc: "AllocationBuilder",
     if inst.categories_items is None:
         all_items = list(inst.items)
         inst.categories_items = {"_all": all_items}
-        inst.categories_capacities = {"_all": min(len(all_items)//2, len(all_items))}
+        inst.categories_capacities = {"_all": min(len(all_items) // 2, len(all_items))}
 
     # One independent W-max step per category
     for cat, items in inst.categories_items.items():
-        s_c = inst.categories_capacities[cat]          # per-agent quota
+        s_c = inst.categories_capacities[cat]  # per-agent quota
         if s_c == 0 or not items:
             continue
 
@@ -901,17 +893,20 @@ def w_max_two_agents(alloc: "AllocationBuilder",
 
         # Split the most positive to a1 and the most negative to a2
         for o, delta in deltas_absolute:
-            if (deltas[o] >= 0 or alloc.remaining_agent_capacities[a2] == 0) and alloc.agents_category_capacities[a1][inst.item_categories[o]] > 0:
+            if (deltas[o] >= 0 or alloc.remaining_agent_capacities[a2] == 0) and alloc.agents_category_capacities[a1][
+                inst.item_categories[o]] > 0:
                 # Give to agent 1 if positive or agent 2 has no capacity left
                 alloc.give(a1, o)
             elif alloc.agents_category_capacities[a2][inst.item_categories[o]] == 0:
                 # No capacity left for agent 2, so give to agent 1
                 alloc.give(a1, o)
-            elif alloc.agents_category_capacities[a1][inst.item_categories[o]] == 0 and alloc.agents_category_capacities[a2][inst.item_categories[o]] == 0:
+            elif alloc.agents_category_capacities[a1][inst.item_categories[o]] == 0 and \
+                    alloc.agents_category_capacities[a2][inst.item_categories[o]] == 0:
                 logger.warning("Both agents have no capacity left, cannot allocate item %s", o)
             else:
                 # negative and agent 2 has capacity left
                 alloc.give(a2, o)
+
 
 # Hevent been tested and the complexity is too large
 # def is_EF11(allocation: "AllocationBuilder",
@@ -1006,7 +1001,8 @@ def w_max_two_agents(alloc: "AllocationBuilder",
 # return None
 
 
-def old_is_EF11(                        # the problem with this function is that it dosent use aperspective to judge the bundel of b and the opposite(also as dor the best good and worst chore)
+def old_is_EF11(
+        # the problem with this function is that it dosent use aperspective to judge the bundel of b and the opposite(also as dor the best good and worst chore)
         instance: "Instance",
         bundles: Dict[Hashable, Iterable[Hashable]],
 ) -> Optional[Tuple[Hashable, Hashable]]:
@@ -1052,7 +1048,7 @@ def old_is_EF11(                        # the problem with this function is that
         cat_of = lambda item: None
     else:
         item_cat = instance.item_categories
-        cat_of   = lambda item: item_cat[item]
+        cat_of = lambda item: item_cat[item]
 
     # ---------- Pre-compute per agent ----------
     #
@@ -1064,25 +1060,25 @@ def old_is_EF11(                        # the problem with this function is that
     max_pos = {a: {} for a in agents}
     total_value = {}
 
-    for ag, B in bundles.items(): # B = items of agent ag
+    for ag, B in bundles.items():  # B = items of agent ag
         tot = 0.0
         for item in B:
-            v = instance.agent_item_value(ag, item) # the items value in the eyes of ag
+            v = instance.agent_item_value(ag, item)  # the items value in the eyes of ag
             tot += v
             c = cat_of(item)
 
-            if v < 0:                          # chore for ag
-                d = min_neg[ag].get(c,  inf)
-                if v < d:                       # store *most* negative
+            if v < 0:  # chore for ag
+                d = min_neg[ag].get(c, inf)
+                if v < d:  # store *most* negative
                     min_neg[ag][c] = v
-            elif v > 0:                         # good for ag
+            elif v > 0:  # good for ag
                 d = max_pos[ag].get(c, -inf)
                 if v > d:
                     max_pos[ag][c] = v
             # v == 0 never helps either side, so ignore
-        total_value[ag] = tot                  # this contain the total value of each agent for their own bundle!!!!!!!
-    print("this is the totoal value amounts",total_value)
-    print("those are the bundels the total value is calculated from",bundles)
+        total_value[ag] = tot  # this contain the total value of each agent for their own bundle!!!!!!!
+    print("this is the totoal value amounts", total_value)
+    print("those are the bundels the total value is calculated from", bundles)
 
     # ---------- Check every ordered pair (i, j) ----------
     for i in agents:
@@ -1090,13 +1086,13 @@ def old_is_EF11(                        # the problem with this function is that
             if i == j:
                 continue
 
-            gap = total_value[i] - total_value[j]      # positive ⇒ no envy
+            gap = total_value[i] - total_value[j]  # positive ⇒ no envy
             if gap >= 0:
-                continue                               # i am already happy
+                continue  # i am already happy
 
             # i envies j.  We must bridge |gap| by removing one chore from i
             # and one good from j in the *same* category.
-            needed = -gap                              # amount we must gain
+            needed = -gap  # amount we must gain
 
             # Iterate only over categories where both sides *could* help.
             #
@@ -1106,7 +1102,7 @@ def old_is_EF11(                        # the problem with this function is that
 
             for c in candidate_categories:
                 gain = -min_neg[i][c] + max_pos[j][c]  # −v_i(chore) + v_i(good)
-                if gain >= needed:                     # envy eliminated
+                if gain >= needed:  # envy eliminated
                     break
             else:
                 return (i, j)  # Found a violating pair
