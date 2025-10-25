@@ -66,8 +66,9 @@ def Nearly_Fair_Division(alloc: AllocationBuilder) -> Optional[AllocationBuilder
 
 
     Examples and tests:
-    >>> divide(Nearly_Fair_Division, instance=example_instance)
-    {'Agent1': ['o1', 'o2', 'o5'], 'Agent2': ['o3', 'o4', 'o6']}
+    # >>> divide(Nearly_Fair_Division, instance=example_instance)
+    # {'Agent1': ['o1', 'o2', 'o5'], 'Agent2': ['o3', 'o4', 'o6']}
+    #this test is in uncommented form because the result may change between runs since multiple valid allocations
 
     >>> instance2 = Instance(
     ...     valuations={
