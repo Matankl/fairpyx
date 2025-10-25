@@ -133,7 +133,7 @@ def Nearly_Fair_Division(alloc: AllocationBuilder) -> Optional[AllocationBuilder
     logger.debug("remaining_item_capacities before w-max = %s", alloc.remaining_item_capacities)
     category_w_max_two_agents(alloc, weights=[0.5, 0.5])
     logger.debug("remaining_item_capacities after w-max = %s", alloc.remaining_item_capacities)
-    logger.debug("Allocation after W-max: %s", alloc.bundles)
+    logger.info(f"Allocation after W-max: {alloc.bundles}, this may noy be the final allocation.")
 
 
     # ---------- 3) envy-elimination loop ----------
@@ -273,6 +273,36 @@ def w_max_two_agents2(alloc: "AllocationBuilder", *, weights: List[float]) -> No
         Current state of the allocation.
     weights : list[float] of length 2
         (w₁, w₂) with  w₁, w₂ ≥ 0  and  w₁ + w₂ = 1.
+
+
+    ---------- How it works ----------
+1) Build a bipartite graph Gw
+Left side: one node per remaining unit of agent capacity.
+If agent A can still take 3 items, you create nodes AG[A]#0, #1, #2.
+(Mapping: agent_copy_to_agent.)
+
+Right side: one node per remaining unit of item capacity.
+If item x has capacity 2 left, you create nodes IT[x]#0, #1.
+(Mapping: item_copy_to_item.)
+
+Edges: connect every feasible agent-copy to every feasible item-copy.
+“Feasible” means:
+no (agent,item) conflict in alloc.remaining_conflicts;
+if category quotas are used, the agent still has ≥1 seat left for that item’s category.
+
+Edge weight:wi*ui*(item).
+You fold the entitlement weight into the value so a single standard max-weight matching solves the weighted problem.
+
+2) Solve matching
+Call networkx.algorithms.matching.max_weight_matching(G, maxcardinality=True, weight="weight").
+maxcardinality=True ⇒ among all matchings that match the maximum number of edges, choose the one with maximum total weight.
+That guarantees you fill as many slots as possible and you maximize the weighted welfare among those.
+
+3) Apply the matches back
+Each matched pair is a single real transfer (one unit) from an item to an agent:
+recover the real agent and item from the copy node names;
+call alloc.give(agent, item) which decrements all the relevant counters (item capacity, agent capacity, per-category capacity, and adds conflict side-effects if your builder does that).
+That’s it—the partial allocation in alloc is now a w-maximal extension over what was still free.
     """
     # ------------------------------------------------------------------
     # (0) Preparations & sanity checks
@@ -381,13 +411,10 @@ def w_max_two_agents2(alloc: "AllocationBuilder", *, weights: List[float]) -> No
     # Done – `alloc` now encodes a w-maximal allocation.
 
 
-# ---------------------------------------------------------------------------
-#  CATEGORY-WISE W-MAX FOR TWO AGENTS
-# ---------------------------------------------------------------------------
-
-
 def category_w_max_two_agents(alloc: "AllocationBuilder", *, weights: List[float]) -> None:
     """
+    the logic of this method is to separate the items by their categories and apply the w-max procedure
+
     Perform Definition 4.1 *within each category separately*.
 
     After the call, `alloc` already contains every item that can be assigned
@@ -481,19 +508,21 @@ def category_w_max_two_agents(alloc: "AllocationBuilder", *, weights: List[float
     >>> sorted(alloc.sorted().values()) in [[['x'], []], [[], ['x']]]
     True
     """
-
+    logger.info("Starting category-wise w-max for two agents with weights = %s", weights)
     inst = alloc.instance
     if len(inst.agents) != 2:
         raise ValueError("category_w_max_two_agents supports exactly two agents.")
     agents = list(inst.agents)
 
     # --- Build a *live* view of remaining items per category ----------------
+    logger.info("Building live view of remaining items per category")
     items_by_cat = defaultdict(list)
     for itm in alloc.remaining_items():
         cat = inst.item_categories.get(itm, "__NO_CAT__")
         items_by_cat[cat].append(itm)
 
     # --- Solve a small w-max instance for each category ---------------------
+    logger.info("Running w-max on each category separately")
     for cat, items_in_cat in items_by_cat.items():
         # Skip if nothing left in this category.
         if not items_in_cat:
@@ -514,7 +543,7 @@ def category_w_max_two_agents(alloc: "AllocationBuilder", *, weights: List[float
             if itm not in items_in_cat:
                 tmp_alloc.remove_item_from_loop(itm)
 
-        # 2. Throttle agent copies to *category* capacity instead of full
+        # 2. Throttle agent copies to category capacity instead of full
         #    remaining capacity.  (We do that by manually shrinking the
         #    per-agent capacity counters.)
         if inst.agents_category_capacities is not None:
@@ -532,7 +561,7 @@ def category_w_max_two_agents(alloc: "AllocationBuilder", *, weights: List[float
             if tmp_alloc.remaining_agent_capacities[ag] <= 0:
                 tmp_alloc.remove_agent_from_loop(ag)
 
-        # 3. Run the *plain* w-max on this trimmed instance.
+        # 3. Run the plain w-max on this trimmed instance.
         if not tmp_alloc.isdone():
             w_max_two_agents2(tmp_alloc, weights=weights)
 
@@ -759,7 +788,7 @@ if __name__ == "__main__":
     import sys
     logger.addHandler(logging.StreamHandler(sys.stdout))
     logger.setLevel(logging.INFO)
-    logger.setLevel(logging.DEBUG)
+    # logger.setLevel(logging.DEBUG)
     print(doctest.testmod())
 
 
