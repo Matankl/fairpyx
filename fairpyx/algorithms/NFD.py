@@ -119,24 +119,30 @@ def Nearly_Fair_Division(alloc: AllocationBuilder) -> Optional[AllocationBuilder
 
     logger.info("Starting NFD run with instance = %s", alloc.instance)
 
-    # ---------- 0) Setup ----------
+    # ---------- 0) Sanity / setup ----------
     inst = alloc.instance
     agents: List[str] = list(inst.agents)
     if len(agents) != 2:
+        logger.error("NFD supports exactly two agents; found %d", len(agents))
         raise NotImplementedError("Current implementation supports exactly two agents.")
 
+    logger.debug("Initial remaining item capacities: %s", alloc.remaining_item_capacities)
+    logger.debug("Initial remaining agent capacities: %s", alloc.remaining_agent_capacities)
+    logger.debug("Initial agents' category capacities (if any): %s",
+                 getattr(alloc, "agents_category_capacities", None))
     # ----------------------------------------------------------------------
-    #  Category–wise W-max
+    #  1) Category–wise W-max allocation
     # ----------------------------------------------------------------------
-    logger.info("Allocating W-maximal allocation for two agents with weights [0.5, 0.5]")
+    logger.info("Compute W-maximal allocation for two agents with weights [0.5, 0.5]")
 
     logger.debug("remaining_item_capacities before w-max = %s", alloc.remaining_item_capacities)
     category_w_max_two_agents(alloc, weights=[0.5, 0.5])
     logger.debug("remaining_item_capacities after w-max = %s", alloc.remaining_item_capacities)
-    logger.info(f"Allocation after W-max: {alloc.bundles}, this may noy be the final allocation.")
+    logger.info(f"Bundles after W-max: {alloc.bundles}, this may noy be the final allocation.")
 
 
-    # ---------- 3) envy-elimination loop ----------
+    # ---------- 2) envy-elimination loop ----------
+    logger.info("Start envy-elimination loop (EF[1,1] checks + swaps)")
     def candidates_r_ratio(instance, bundles, envier, envied):
         """
         Find all same-category (o_envier, o_envied) pairs whose swap would improve
@@ -167,6 +173,7 @@ def Nearly_Fair_Division(alloc: AllocationBuilder) -> Optional[AllocationBuilder
         * Works with either lists or sets inside *bundles*.
 
         """
+        logger.debug("Finding candidate swaps for envier=%s envied=%s", envier, envied)
         # Turn ∪/list into a list to iterate cheaply
         envier_items = list(bundles[envier])
         envied_items = list(bundles[envied])
@@ -202,31 +209,42 @@ def Nearly_Fair_Division(alloc: AllocationBuilder) -> Optional[AllocationBuilder
 
         # Best first
         pairs.sort(key=lambda t: t[0], reverse=True)
+        logger.info("Found %d candidate swaps (best r=%.4f) for envier=%s",
+                    len(pairs), pairs[0][0] if pairs else float('-inf'), envier)
         return pairs
 
+    # Main loop: run until allocation is EF[1,1] or we fail to fix envy
     while True:
+        # Check EF[1,1]
+
         status = is_EF11(alloc.instance, alloc.bundles)
-        if is_EF1(alloc) is None or status is None:
+        ef1_status = is_EF1(alloc)
+        logger.debug("EF[1,1] check result=%s EF1 check result=%s", status, ef1_status)
+
+        if ef1_status is None or status is None:
+            logger.info("Allocation is both EF[1,1] and EF1. Final bundles=%s", alloc.bundles)
             break
 
-        logger.info(f"W-max allocation is not EF[1,1], starting envy-elimination iteration. {status}")
         envier, envied = status
+        logger.info("EF[1,1] violation found: envier=%s envied=%s, starting envy-elimination iteration.", envier, envied)
 
         # Candidate items that envier can still accept
         logger.info("Finding candidates to swap for envier %s and envied %s", envier, envied)
         candidates = candidates_r_ratio(inst, alloc.bundles, envier, envied)
         if candidates:
             r_best, o_envier, o_envied = candidates[0]
-            logger.info("Swapping items %s (envier) and %s (envied) with r = %.2f",
+            logger.info("Selected best candidate items swap: %s (envier) <-> %s (envied) with r=%.4f",
                         o_envier, o_envied, r_best)
             # preform the swap
             alloc.swap(envier, o_envier, envied, o_envied)
 
         else:
-            logger.warning("No more candidates to swap, breaking the loop, the envy cant be fixed!!.")
+            logger.warning("No feasible candidate swaps exist to remove envy for (%s, %s). Returning None.",
+                           envier, envied)
             return None
 
-    logger.info("We have a final NFD allocation: %s \n\n", alloc.bundles)
+
+    logger.info("NFD finished successfully. Final allocation: %s \n\n\n\n", alloc.bundles)
     return alloc
 
 # ---------------------------------------------------------------------------
@@ -258,7 +276,7 @@ def Nearly_Fair_Division(alloc: AllocationBuilder) -> Optional[AllocationBuilder
 #               it is a w-maximal allocation in the sense of the paper.
 #
 # ---------------------------------------------------------------------------
-def w_max_two_agents2(alloc: "AllocationBuilder", *, weights: List[float]) -> None:
+def w_max_two_agents2(alloc: "AllocationBuilder", weights: List[float]) -> None:
     """
     Compute a w-maximal allocation on the still unassigned part of `alloc`
     for the *two* agents that are present in the instance.
@@ -340,7 +358,6 @@ That’s it—the partial allocation in alloc is now a w-maximal extension over 
             G.add_node(node, bipartite=0)
 
     # (1b) COPY NODES FOR ITEMS
-    #
     # One copy for every still available unit of each item’s capacity.
     item_copy_to_item : Dict[str, str] = {}
     for itm, cap in item_cap.items():
